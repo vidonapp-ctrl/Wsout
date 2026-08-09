@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#008069" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111b21" media="(prefers-color-scheme: dark)">
+  <title>WhatsOut</title>
+  <script src="cordova.js"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #008069;
+      overscroll-behavior-y: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #111b21;
+      }
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background-color: transparent;
+    }
+  </style>
+</head>
+<body>
+  <iframe src="https://wsout.edgeone.dev/" allow="camera; microphone"></iframe>
+  
+  <script>
+    // Dynamic Status Bar Theme Manager for VoltBuilder, Cordova & Capacitor
+    function getLuminance(hex) {
+      if (!hex || typeof hex !== 'string') return 0;
+      const c = hex.replace('#', '');
+      if (c.length !== 6) return 0;
+      const r = parseInt(c.substring(0, 2), 16) || 0;
+      const g = parseInt(c.substring(2, 4), 16) || 0;
+      const b = parseInt(c.substring(4, 6), 16) || 0;
+      return (0.299 * r + 0.587 * g + 0.114 * b);
+    }
+
+    async function applyStatusBarColor(color) {
+      if (!color) return;
+      document.body.style.backgroundColor = color;
+      
+      // Update HTML meta theme-color tag dynamically
+      let meta = document.querySelector('meta[name="theme-color"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'theme-color';
+        document.head.appendChild(meta);
+      }
+      meta.content = color;
+
+      const lum = getLuminance(color);
+      const isLightBackground = lum > 160;
+
+      // 1. Capacitor StatusBar Plugin
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.StatusBar) {
+        try {
+          const StatusBar = window.Capacitor.Plugins.StatusBar;
+          await StatusBar.setOverlaysWebView({ overlay: false });
+          await StatusBar.setBackgroundColor({ color: color });
+          await StatusBar.setStyle({
+            style: isLightBackground ? 'DARK' : 'LIGHT'
+          });
+        } catch (e) {}
+      }
+
+      // 2. Cordova / VoltBuilder StatusBar Plugin
+      if (window.StatusBar) {
+        try {
+          window.StatusBar.overlaysWebView(false);
+          window.StatusBar.backgroundColorByHexString(color);
+          if (isLightBackground) {
+            window.StatusBar.styleDefault(); // Dark text on light status bar
+          } else {
+            window.StatusBar.styleLightContent(); // Light text on dark status bar
+          }
+        } catch (e) {}
+      }
+    }
+
+    async function updateStatusBar(customColor) {
+      const lightColorHex = '#008069';
+      const darkColorHex = '#111b21';
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
+      let activeColor = typeof customColor === 'string' ? customColor : (isDark ? darkColorHex : lightColorHex);
+
+      // Try reading iframe's meta theme-color if same-origin
+      if (!customColor || typeof customColor !== 'string') {
+        try {
+          const iframe = document.querySelector('iframe');
+          if (iframe && iframe.contentDocument) {
+            const meta = iframe.contentDocument.querySelector('meta[name="theme-color"]');
+            if (meta && meta.content) {
+              activeColor = meta.content;
+            }
+          }
+        } catch (e) {}
+      }
+
+      await applyStatusBarColor(activeColor);
+    }
+
+    // Cordova deviceready event for VoltBuilder
+    document.addEventListener('deviceready', () => {
+      updateStatusBar();
+    });
+
+    // Initial checks
+    setTimeout(updateStatusBar, 300);
+    setTimeout(updateStatusBar, 1000);
+
+    // Listen for device light/dark mode toggles (System Theme Changes)
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      updateStatusBar();
+    });
+
+    // Listen for postMessage theme color updates from iframe
+    window.addEventListener('message', (event) => {
+      if (!event.data) return;
+      
+      if (event.data.themeColor || (event.data.type === 'THEME_COLOR_CHANGED' && event.data.themeColor)) {
+        applyStatusBarColor(event.data.themeColor || event.data.color);
+      }
+      
+      if (event.data.type === 'MINIMIZE_APP' && window.Capacitor && window.Capacitor.Plugins.App) {
+        window.Capacitor.Plugins.App.minimizeApp();
+      }
+    });
+
+    // Native App behavior initialization (Hardware back button, Push Notifications)
+    setTimeout(() => {
+      if (window.Capacitor) {
+        if (window.Capacitor.Plugins.App) {
+          window.Capacitor.Plugins.App.addListener('backButton', () => {
+            const iframe = document.querySelector('iframe');
+            if (iframe && iframe.contentWindow) {
+              iframe.contentWindow.postMessage({ type: 'HARDWARE_BACK' }, '*');
+            } else {
+              window.Capacitor.Plugins.App.minimizeApp();
+            }
+          });
+        }
+        
+        if (window.Capacitor.Plugins.LocalNotifications) {
+          window.Capacitor.Plugins.LocalNotifications.requestPermissions().then(result => {
+            // Local Notifications ready
+          }).catch(() => {});
+        }
+        
+      }
+    }, 1000);
+
+    // Check on iframe load
+    const iframe = document.querySelector('iframe');
+    if (iframe) {
+      iframe.addEventListener('load', () => {
+        updateStatusBar();
+        if (window.Capacitor && window.Capacitor.Plugins.SplashScreen) {
+          window.Capacitor.Plugins.SplashScreen.hide();
+        }
+      });
+      
+      // Fallback: Si el iframe no dispara 'load' en 8 segundos (red lenta), oculta el splash
+      setTimeout(() => {
+        if (window.Capacitor && window.Capacitor.Plugins.SplashScreen) {
+          window.Capacitor.Plugins.SplashScreen.hide();
+        }
+      }, 8000);
+    }
+  </script>
+</body>
+</html>

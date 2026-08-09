@@ -1,0 +1,45 @@
+{
+  "appId": "com.samueljsr.whatsout",
+  "appName": "WhatsOut",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "allowNavigation": [
+      "*"
+    ]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "buildOptions": {
+      "keystorePath": "",
+      "keystoreAlias": ""
+    }
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": true,
+      "backgroundColor": "#00000000",
+      "style": "LIGHT"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 10000,
+      "launchAutoHide": false,
+      "backgroundColor": "#111b21",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": true,
+      "androidSpinnerStyle": "large",
+      "iosSpinnerStyle": "small",
+      "spinnerColor": "#999999",
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "Keyboard": {
+      "resize": "body",
+      "style": "dark",
+      "resizeOnFullScreen": true
+    }
+  }
+}
